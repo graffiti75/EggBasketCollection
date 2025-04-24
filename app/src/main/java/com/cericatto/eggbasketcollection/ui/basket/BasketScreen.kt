@@ -24,7 +24,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -107,7 +106,16 @@ fun BasketScreenContent(
 				)
 			)
 	) {
-		EggPoints()
+		Row(
+			verticalAlignment = Alignment.CenterVertically,
+			horizontalArrangement = Arrangement.SpaceBetween,
+			modifier = Modifier
+				.fillMaxWidth()
+				.padding(horizontal = 10.dp)
+		) {
+			EggPoints()
+			RestartButton()
+		}
 		Text(
 			text = "Easter Basket",
 			style = TextStyle(
@@ -129,10 +137,7 @@ private fun EggPoints(
 	modifier: Modifier = Modifier
 ) {
 	Box(
-		contentAlignment = Alignment.CenterStart,
-		modifier = modifier
-			.fillMaxWidth()
-			.padding(top = 40.dp, start = 20.dp)
+		contentAlignment = Alignment.Center
 	) {
 		Row(
 			horizontalArrangement = Arrangement.Center,
@@ -168,6 +173,40 @@ private fun EggPoints(
 				.size(56.dp)
 				.rotate(-10f)
 				.align(Alignment.CenterStart)
+		)
+	}
+}
+
+@Composable
+private fun RestartButton() {
+	Row(
+		horizontalArrangement = Arrangement.Center,
+		verticalAlignment = Alignment.CenterVertically,
+		modifier = Modifier
+			.background(
+				color = Color(0xFFC7C7C7),
+				shape = RoundedCornerShape(10.dp)
+			)
+			.padding(3.dp)
+			.background(
+				color = Color(0xFF9C9C9C),
+				shape = RoundedCornerShape(10.dp)
+			)
+			.padding(5.dp)
+	) {
+		Image(
+			painter = painterResource(R.drawable.restart),
+			contentDescription = "Restart",
+			modifier = Modifier
+				.size(32.dp)
+		)
+		Text(
+			text = "Restart",
+			style = TextStyle(
+				fontFamily = nunitoBoldFont,
+				color = Color.White,
+				fontSize = 18.sp
+			),
 		)
 	}
 }
