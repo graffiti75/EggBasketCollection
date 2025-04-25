@@ -1,9 +1,10 @@
 package com.cericatto.eggbasketcollection.ui.basket
 
-import android.graphics.drawable.Drawable
+import android.graphics.RectF
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,18 +20,25 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -38,9 +46,6 @@ import androidx.core.graphics.createBitmap
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cericatto.eggbasketcollection.R
-import com.cericatto.eggbasketcollection.ui.components.Dp2Float
-import com.cericatto.eggbasketcollection.ui.components.getCanvasHeight
-import com.cericatto.eggbasketcollection.ui.components.getCanvasWidth
 import com.cericatto.eggbasketcollection.ui.theme.backgroundFirstColor
 import com.cericatto.eggbasketcollection.ui.theme.backgroundLastColor
 import com.cericatto.eggbasketcollection.ui.theme.brown
@@ -68,7 +73,7 @@ private fun BasketScreen(
 ) {
 	if (state.loading) {
 		Box(
-			modifier = Modifier
+			modifier = modifier
 				.padding(vertical = 20.dp)
 				.fillMaxSize(),
 			contentAlignment = Alignment.Center
@@ -82,7 +87,8 @@ private fun BasketScreen(
 	} else {
 		BasketScreenContent(
 			onAction = onAction,
-			state = state
+			state = state,
+			modifier = modifier
 		)
 	}
 }
@@ -90,12 +96,13 @@ private fun BasketScreen(
 @Composable
 fun BasketScreenContent(
 	onAction: (BasketScreenAction) -> Unit,
-	state: BasketScreenState
+	state: BasketScreenState,
+	modifier: Modifier = Modifier,
 ) {
 	Column(
 		verticalArrangement = Arrangement.Top,
 		horizontalAlignment = Alignment.CenterHorizontally,
-		modifier = Modifier
+		modifier = modifier
 			.fillMaxSize()
 			.background(
 				brush = Brush.verticalGradient(
@@ -105,6 +112,7 @@ fun BasketScreenContent(
 					)
 				)
 			)
+			.padding(top = 10.dp)
 	) {
 		Row(
 			verticalAlignment = Alignment.CenterVertically,
@@ -212,86 +220,120 @@ private fun RestartButton() {
 }
 
 @Composable
-private fun DrawCanvas(
+fun DrawCanvas(
 	onAction: (BasketScreenAction) -> Unit,
 	state: BasketScreenState,
 	modifier: Modifier = Modifier
 ) {
 	val context = LocalContext.current
-	val canvasWidth = getCanvasWidth().Dp2Float()
-	// 80% of the height of the screen will be the Canvas.
-	val canvasHeight = (getCanvasHeight().Dp2Float() / 5) * 4
-	val egg: Drawable? = ContextCompat.getDrawable(context, R.drawable.egg_normal)
-	val basket: Drawable? = ContextCompat.getDrawable(context, R.drawable.basket_zero_normal)
-	val padding = 40.dp.Dp2Float()
+	val density = LocalDensity.current
+	val egg = ContextCompat.getDrawable(context, R.drawable.egg_normal)
+	val basket = ContextCompat.getDrawable(context, R.drawable.basket_zero_normal)
+	val padding = with(density) { 40.dp.toPx() }
 	val unit = 300f
-	val positions = listOf<CanvasPoint>(
-		CanvasPoint(point = Offset(canvasWidth / 3, padding), rotation = 10f),
-		CanvasPoint(point = Offset(10f, canvasHeight / 4), rotation = -25f),
-		CanvasPoint(point = Offset(canvasWidth / 3, canvasHeight / 3), rotation = 0f),
-		CanvasPoint(point = Offset(canvasWidth - unit, canvasHeight / 4), rotation = 20f, scale = 0.8f),
-		CanvasPoint(point = Offset(10f, canvasHeight / 2), rotation = -20f),
-		CanvasPoint(point = Offset(canvasWidth - unit, canvasHeight / 2), rotation = 20f, scale = 0.9f),
-	)
-	Box(
-		contentAlignment = Alignment.Center,
+
+	// State for canvas size
+	var canvasSize by remember { mutableStateOf(IntSize.Zero) }
+	val canvasWidth = canvasSize.width.toFloat()
+	val canvasHeight = canvasSize.height.toFloat() * 0.8f // 80% of screen height
+
+	// Egg positions with absolute coordinates
+	val eggPositions = remember(canvasWidth, canvasHeight) {
+		mutableStateListOf(
+			CanvasPoint(point = Offset(canvasWidth / 3, padding), rotation = 10f),
+			CanvasPoint(point = Offset(10f, canvasHeight / 4), rotation = -25f),
+			CanvasPoint(point = Offset(canvasWidth / 3, canvasHeight / 3), rotation = 0f),
+			CanvasPoint(point = Offset(canvasWidth - unit, canvasHeight / 4), rotation = 20f, scale = 0.8f),
+			CanvasPoint(point = Offset(10f, canvasHeight / 2), rotation = -20f),
+			CanvasPoint(point = Offset(canvasWidth - unit, canvasHeight / 2), rotation = 20f, scale = 0.9f)
+		)
+	}
+
+	// Create bitmap with remembered size
+	val bitmap = remember(canvasSize) {
+		if (canvasSize != IntSize.Zero) {
+			createBitmap(canvasSize.width, canvasSize.height)
+		} else {
+			createBitmap(1, 1) // Fallback
+		}
+	}
+
+	Canvas(
 		modifier = modifier
 			.fillMaxSize()
-	) {
-		Canvas(
-			modifier = modifier
-				.fillMaxSize()
-				.clipToBounds()
-		) {
-			/*
-			drawRect(
-				color = Color.Yellow,
-				topLeft = Offset(0f, 0f),
-				size = Size(
-					width = canvasWidth,
-					height = canvasHeight
-				)
-			)
-			 */
-			positions.forEachIndexed { index, point ->
-				egg?.let { draw ->
-					val bitmap = createBitmap(size.width.toInt(), size.height.toInt())
-					val canvas = android.graphics.Canvas(bitmap)
-
-					val centerX = point.point.x.toInt() + draw.intrinsicWidth / 2f
-					val centerY = point.point.y.toInt() + draw.intrinsicHeight / 2f
-					val rotationAngle = point.rotation
-					canvas.rotate(rotationAngle, centerX, centerY)
-					draw.setBounds(
-						point.point.x.toInt(),
-						point.point.y.toInt(),
-						(point.point.x.toInt() + draw.intrinsicWidth * point.scale).toInt(),
-						(point.point.y.toInt() + draw.intrinsicHeight * point.scale).toInt()
-					)
-					draw.draw(canvas)
-					drawImage(
-						image = bitmap.asImageBitmap()
-					)
+			.onGloballyPositioned { coordinates ->
+				canvasSize = coordinates.size
+			}
+			.pointerInput(Unit) {
+				detectDragGestures(
+					onDragStart = { offset ->
+						eggPositions.forEachIndexed { index, point ->
+							val bounds = RectF(
+								point.point.x,
+								point.point.y,
+								point.point.x + (egg?.intrinsicWidth?.toFloat() ?: 0f) * point.scale,
+								point.point.y + (egg?.intrinsicHeight?.toFloat() ?: 0f) * point.scale
+							)
+							if (bounds.contains(offset.x, offset.y)) {
+								point.isDragging = true
+							}
+						}
+					},
+					onDragEnd = {
+						eggPositions.forEach { it.isDragging = false }
+					}
+				) { change, dragAmount ->
+					eggPositions.forEachIndexed { index, point ->
+						if (point.isDragging) {
+							val newX = (point.point.x + dragAmount.x)
+								.coerceIn(0f, size.width - (egg?.intrinsicWidth?.toFloat() ?: 0f) * point.scale)
+							val newY = (point.point.y + dragAmount.y)
+								.coerceIn(0f, size.height - (egg?.intrinsicHeight?.toFloat() ?: 0f) * point.scale)
+							eggPositions[index] = point.copy(
+								point = Offset(newX, newY)
+							)
+						}
+					}
+					change.consume()
 				}
 			}
-			basket?.let { draw ->
-				val bitmap = createBitmap(size.width.toInt(), size.height.toInt())
-				val canvas = android.graphics.Canvas(bitmap)
-				val width = draw.intrinsicWidth
-				val halfWidth = (width / 2f).toInt()
-				val height = draw.intrinsicHeight
+	) {
+		val canvas = android.graphics.Canvas(bitmap)
+		canvas.drawColor(android.graphics.Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
+
+		// Draw eggs.
+		eggPositions.forEach { point ->
+			egg?.let { draw ->
+				val centerX = point.point.x + draw.intrinsicWidth / 2f
+				val centerY = point.point.y + draw.intrinsicHeight / 2f
+				canvas.rotate(point.rotation, centerX, centerY)
 				draw.setBounds(
-					(canvasWidth / 2 - halfWidth).toInt(),
-					canvasHeight.toInt() - height,
-					(canvasWidth / 2 - halfWidth).toInt() + draw.intrinsicWidth,
-					canvasHeight.toInt() - height + draw.intrinsicHeight,
+					point.point.x.toInt(),
+					point.point.y.toInt(),
+					(point.point.x + draw.intrinsicWidth * point.scale).toInt(),
+					(point.point.y + draw.intrinsicHeight * point.scale).toInt()
 				)
 				draw.draw(canvas)
-				drawImage(
-					image = bitmap.asImageBitmap()
-				)
+				canvas.rotate(-point.rotation, centerX, centerY)
 			}
 		}
+
+		// Draw fixed basket.
+		basket?.let { draw ->
+			val width = draw.intrinsicWidth
+			val height = draw.intrinsicHeight
+			val basketX = (size.width - width) / 2
+			val basketY = size.height - height
+			draw.setBounds(
+				basketX.toInt(),
+				basketY.toInt(),
+				(basketX + width).toInt(),
+				(basketY + height).toInt()
+			)
+			draw.draw(canvas)
+		}
+
+		drawImage(image = bitmap.asImageBitmap())
 	}
 }
 
