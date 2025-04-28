@@ -5,6 +5,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -227,7 +228,8 @@ fun DrawCanvas(
 ) {
 	val context = LocalContext.current
 	val density = LocalDensity.current
-	val egg = ContextCompat.getDrawable(context, R.drawable.egg_normal)
+	val eggNormal = ContextCompat.getDrawable(context, R.drawable.egg_normal)
+	val eggShine = ContextCompat.getDrawable(context, R.drawable.egg_shine)
 	val basket = ContextCompat.getDrawable(context, R.drawable.basket_zero_normal)
 	val padding = with(density) { 40.dp.toPx() }
 	val unit = 300f
@@ -265,14 +267,15 @@ fun DrawCanvas(
 				canvasSize = coordinates.size
 			}
 			.pointerInput(Unit) {
+				// Handle drag gestures
 				detectDragGestures(
 					onDragStart = { offset ->
 						eggPositions.forEachIndexed { index, point ->
 							val bounds = RectF(
 								point.point.x,
 								point.point.y,
-								point.point.x + (egg?.intrinsicWidth?.toFloat() ?: 0f) * point.scale,
-								point.point.y + (egg?.intrinsicHeight?.toFloat() ?: 0f) * point.scale
+								point.point.x + (eggNormal?.intrinsicWidth?.toFloat() ?: 0f) * point.scale,
+								point.point.y + (eggNormal?.intrinsicHeight?.toFloat() ?: 0f) * point.scale
 							)
 							if (bounds.contains(offset.x, offset.y)) {
 								point.isDragging = true
@@ -286,9 +289,9 @@ fun DrawCanvas(
 					eggPositions.forEachIndexed { index, point ->
 						if (point.isDragging) {
 							val newX = (point.point.x + dragAmount.x)
-								.coerceIn(0f, size.width - (egg?.intrinsicWidth?.toFloat() ?: 0f) * point.scale)
+								.coerceIn(0f, size.width - (eggNormal?.intrinsicWidth?.toFloat() ?: 0f) * point.scale)
 							val newY = (point.point.y + dragAmount.y)
-								.coerceIn(0f, size.height - (egg?.intrinsicHeight?.toFloat() ?: 0f) * point.scale)
+								.coerceIn(0f, size.height - (eggNormal?.intrinsicHeight?.toFloat() ?: 0f) * point.scale)
 							eggPositions[index] = point.copy(
 								point = Offset(newX, newY)
 							)
@@ -296,14 +299,35 @@ fun DrawCanvas(
 					}
 					change.consume()
 				}
+				// Handle tap gestures to unselect eggs
+				detectTapGestures { offset ->
+					var isEggTapped = false
+					eggPositions.forEachIndexed { index, point ->
+						val bounds = RectF(
+							point.point.x,
+							point.point.y,
+							point.point.x + (eggNormal?.intrinsicWidth?.toFloat() ?: 0f) * point.scale,
+							point.point.y + (eggNormal?.intrinsicHeight?.toFloat() ?: 0f) * point.scale
+						)
+						if (bounds.contains(offset.x, offset.y)) {
+							isEggTapped = true
+							point.isDragging = true
+						}
+					}
+					if (!isEggTapped) {
+						eggPositions.forEach { it.isDragging = false }
+					}
+				}
 			}
 	) {
 		val canvas = android.graphics.Canvas(bitmap)
 		canvas.drawColor(android.graphics.Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
 
-		// Draw eggs.
+		// Draw eggs
 		eggPositions.forEach { point ->
-			egg?.let { draw ->
+			// Choose drawable based on isDragging
+			val eggDrawable = if (point.isDragging) eggShine else eggNormal
+			eggDrawable?.let { draw ->
 				val centerX = point.point.x + draw.intrinsicWidth / 2f
 				val centerY = point.point.y + draw.intrinsicHeight / 2f
 				canvas.rotate(point.rotation, centerX, centerY)
@@ -318,7 +342,7 @@ fun DrawCanvas(
 			}
 		}
 
-		// Draw fixed basket.
+		// Draw fixed basket
 		basket?.let { draw ->
 			val width = draw.intrinsicWidth
 			val height = draw.intrinsicHeight
