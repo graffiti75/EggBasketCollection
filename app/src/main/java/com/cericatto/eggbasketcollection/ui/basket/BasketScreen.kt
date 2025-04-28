@@ -4,6 +4,7 @@ import android.graphics.RectF
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -27,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -123,7 +125,11 @@ fun BasketScreenContent(
 				.padding(horizontal = 10.dp)
 		) {
 			EggPoints()
-			RestartButton()
+			RestartButton(
+				onAction = onAction,
+				state = state,
+				modifier = Modifier
+			)
 		}
 		Text(
 			text = "Easter Basket",
@@ -187,11 +193,23 @@ private fun EggPoints(
 }
 
 @Composable
-private fun RestartButton() {
+private fun RestartButton(
+	onAction: (BasketScreenAction) -> Unit,
+	state: BasketScreenState,
+	modifier: Modifier = Modifier
+) {
 	Row(
 		horizontalArrangement = Arrangement.Center,
 		verticalAlignment = Alignment.CenterVertically,
-		modifier = Modifier
+		modifier = modifier
+			.alpha(
+				if (!state.changedEggPositions) 0f else 1f
+			)
+			.clickable {
+				onAction(
+					BasketScreenAction.OnResetButtonClicked
+				)
+			}
 			.background(
 				color = Color(0xFFC7C7C7),
 				shape = RoundedCornerShape(10.dp)
@@ -232,22 +250,28 @@ fun DrawCanvas(
 	val eggShine = ContextCompat.getDrawable(context, R.drawable.egg_shine)
 	val basket = ContextCompat.getDrawable(context, R.drawable.basket_zero_normal)
 	val padding = with(density) { 40.dp.toPx() }
-	val unit = 300f
 
 	// State for canvas size
 	var canvasSize by remember { mutableStateOf(IntSize.Zero) }
 	val canvasWidth = canvasSize.width.toFloat()
 	val canvasHeight = canvasSize.height.toFloat() * 0.8f // 80% of screen height
 
-	// Egg positions with absolute coordinates
-	val eggPositions = remember(canvasWidth, canvasHeight) {
+	// Egg positions with absolute coordinates.
+	// Used the spread operator (*) to convert List<CanvasPoint> to varargs for mutableStateListOf.
+	var eggPositions = remember(canvasWidth, canvasHeight) {
 		mutableStateListOf(
-			CanvasPoint(point = Offset(canvasWidth / 3, padding), rotation = 10f),
-			CanvasPoint(point = Offset(10f, canvasHeight / 4), rotation = -25f),
-			CanvasPoint(point = Offset(canvasWidth / 3, canvasHeight / 3), rotation = 0f),
-			CanvasPoint(point = Offset(canvasWidth - unit, canvasHeight / 4), rotation = 20f, scale = 0.8f),
-			CanvasPoint(point = Offset(10f, canvasHeight / 2), rotation = -20f),
-			CanvasPoint(point = Offset(canvasWidth - unit, canvasHeight / 2), rotation = 20f, scale = 0.9f)
+			*initialEggPositions(canvasWidth, canvasHeight, padding).toTypedArray()
+		)
+	}
+
+	if (state.reset) {
+		eggPositions = remember(canvasWidth, canvasHeight) {
+			mutableStateListOf(
+				*initialEggPositions(canvasWidth, canvasHeight, padding).toTypedArray()
+			)
+		}
+		onAction(
+			BasketScreenAction.OnAfterResetButtonClicked
 		)
 	}
 
@@ -292,8 +316,15 @@ fun DrawCanvas(
 								.coerceIn(0f, size.width - (eggNormal?.intrinsicWidth?.toFloat() ?: 0f) * point.scale)
 							val newY = (point.point.y + dragAmount.y)
 								.coerceIn(0f, size.height - (eggNormal?.intrinsicHeight?.toFloat() ?: 0f) * point.scale)
+							// FIXME
+//							onAction(
+//								BasketScreenAction.UpdateEggPosition(index, Offset(newX, newY))
+//							)
 							eggPositions[index] = point.copy(
 								point = Offset(newX, newY)
+							)
+							onAction(
+								BasketScreenAction.CheckEggPositionsChanged(eggPositions)
 							)
 						}
 					}

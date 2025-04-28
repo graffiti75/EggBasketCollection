@@ -16,7 +16,16 @@ class BasketScreenViewModel @Inject constructor(): ViewModel() {
 
 	fun onAction(action: BasketScreenAction) {
 		when (action) {
-			is BasketScreenAction.FlipCard -> TODO()
+//			is BasketScreenAction.UpdateEggPositions -> updateEggPositions(action.eggPositions)
+//			is BasketScreenAction.UpdateEggPosition -> updateEggPosition(action.index, action.offset)
+			is BasketScreenAction.UpdateCanvasDimensions -> updateCanvasDimensions(
+				action.canvasWidth,
+				action.canvasHeight,
+				action.padding
+			)
+			is BasketScreenAction.OnResetButtonClicked -> onResetButtonClicked()
+			is BasketScreenAction.CheckEggPositionsChanged -> checkEggPositionsChanged(action.eggPositions)
+			is BasketScreenAction.OnAfterResetButtonClicked -> onAfterResetButtonClicked()
 		}
 	}
 
@@ -24,6 +33,80 @@ class BasketScreenViewModel @Inject constructor(): ViewModel() {
 		_state.update { state ->
 			state.copy(
 				loading = false
+			)
+		}
+	}
+
+	/*
+	private fun updateEggPosition(index: Int, offset: Offset) {
+		var updatedEggPositions = _state.value.eggPositions.toMutableList()
+		updatedEggPositions[index].point = offset
+		_state.update { state ->
+			state.copy(
+				eggPositions = updatedEggPositions.toList()
+			)
+		}
+	}
+	 */
+
+	/*
+	private fun updateEggPositions(eggPositions: List<CanvasPoint>) {
+		_state.update { state ->
+			state.copy(
+				eggPositions = eggPositions,
+				changedEggPositions = state.eggPositionsChanged()
+			)
+		}
+	}
+	 */
+
+	private fun updateCanvasDimensions(
+		canvasWidth: Float = 0f,
+		canvasHeight: Float = 0f,
+		padding: Float = 0f
+	) {
+		_state.update { state ->
+			state.copy(
+				canvasWidth = canvasWidth,
+				canvasHeight = canvasHeight,
+				padding = padding,
+				eggPositions = initialEggPositions(
+					canvasWidth = canvasWidth,
+					canvasHeight = canvasHeight,
+					padding = padding,
+				)
+			)
+		}
+	}
+
+	private fun onResetButtonClicked() {
+		println("BasketScreenViewModel.onResetButtonClicked()")
+		_state.update { state ->
+			state.copy(
+				reset = true,
+				changedEggPositions = false
+			)
+		}
+	}
+
+	private fun onAfterResetButtonClicked() {
+		println("BasketScreenViewModel.onAfterResetButtonClicked()")
+		_state.update { state ->
+			state.copy(
+				reset = false
+			)
+		}
+	}
+
+	private fun checkEggPositionsChanged(eggPositions: List<CanvasPoint>) {
+		_state.update { state ->
+			state.copy(
+				changedEggPositions = eggPositionsChanged(
+					eggPositions = eggPositions,
+					canvasWidth = state.canvasWidth,
+					canvasHeight = state.canvasHeight,
+					padding = state.padding
+				)
 			)
 		}
 	}
