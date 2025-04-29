@@ -1,13 +1,16 @@
 package com.cericatto.eggbasketcollection.ui.basket
 
 import androidx.compose.ui.geometry.Offset
+import java.util.UUID
 
 const val EGG_NUMBER = 6
 
 data class CanvasPoint(
+	var key: String = UUID.randomUUID().toString(),
 	var point: Offset,
 	val rotation: Float = 0f,
 	val scale: Float = 1f,
+	val alpha: Int = 255,
 	var isDragging: Boolean = false
 )
 

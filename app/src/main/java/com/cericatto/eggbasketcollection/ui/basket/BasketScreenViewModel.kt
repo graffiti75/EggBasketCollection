@@ -109,34 +109,42 @@ class BasketScreenViewModel @Inject constructor() : ViewModel() {
 	}
 
 	private fun checkEggsInBasket(eggPositions: List<CanvasPoint>) {
-		val basketBounds = _state.value.basketBounds ?: return
+		val currentState = _state.value
+		val basketBounds = currentState.basketBounds ?: return
+
+		// Create a copy of egg positions to modify.
+		val updatedEggPositions = eggPositions.toMutableList()
 
 		// Count eggs that have their center point inside the basket.
 		var count = 0
-		for (eggPosition in eggPositions) {
-			// Calculate egg center point
-			val eggWidth = 100f * eggPosition.scale // Approximate egg width
-			val eggHeight = 130f * eggPosition.scale // Approximate egg height
+		for (i in eggPositions.indices) {
+			val eggPosition = eggPositions[i]
+
+			// Calculate egg center point.
+			val eggWidth = 100f * eggPosition.scale // Approximate egg width.
+			val eggHeight = 130f * eggPosition.scale // Approximate egg height.
 
 			val eggCenterX = eggPosition.point.x + eggWidth / 2
 			val eggCenterY = eggPosition.point.y + eggHeight / 2
 
-			// Check if center is in basket bounds
+			// Check if center is in basket bounds.
 			if (basketBounds.contains(eggCenterX, eggCenterY)) {
 				count++
-				_state.update { state ->
-					state.copy(hotZone = true)
-				}
+				// Update the alpha directly in our copy
+				updatedEggPositions[i] = eggPosition.copy(alpha = 0)
 			} else {
-				_state.update { state ->
-					state.copy(hotZone = false)
-				}
+				// Make sure eggs outside basket are visible
+				updatedEggPositions[i] = eggPosition.copy(alpha = 255)
 			}
 		}
 
-		// Update state with new count
+		// Update state with new positions and count.
 		_state.update { state ->
-			state.copy(eggsInBasket = count)
+			state.copy(
+				hotZone = count > 0,
+				eggsInBasket = count,
+				eggPositions = updatedEggPositions
+			)
 		}
 	}
 
@@ -144,7 +152,6 @@ class BasketScreenViewModel @Inject constructor() : ViewModel() {
 		viewModelScope.launch {
 			callSnackbar(UiText.StringResource(R.string.collected_all))
 		}
-
 	}
 
 	private suspend fun callSnackbar(text: UiText) {

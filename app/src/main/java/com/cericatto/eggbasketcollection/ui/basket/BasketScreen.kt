@@ -25,6 +25,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -81,6 +82,7 @@ fun BasketScreenRoot(
 					)
 				}
 			}
+
 			else -> Unit
 		}
 	}
@@ -307,14 +309,10 @@ fun DrawCanvas(
 		)
 	}
 
-	if (state.hotZone) {
-
-	}
-
-	// Then handle the reset by updating the existing list
+	// Then handle the reset by updating the existing list.
 	if (state.reset) {
 		val initialPositions = initialEggPositions(canvasWidth, canvasHeight, padding)
-		// Update existing list in-place instead of creating a new one
+		// Update existing list in-place instead of creating a new one.
 		for (i in eggPositions.indices) {
 			if (i < initialPositions.size) {
 				eggPositions[i] = initialPositions[i]
@@ -323,12 +321,26 @@ fun DrawCanvas(
 		onAction(BasketScreenAction.OnAfterResetButtonClicked)
 	}
 
-	// Create bitmap with remembered size
+	// Update alpha values from state.eggPositions.
+	// This ensures that the alpha values from ViewModel are applied.
+	LaunchedEffect(state.eggPositions) {
+		if (state.eggPositions.isNotEmpty() && eggPositions.isNotEmpty()) {
+			// Just update the alpha values, not positions.
+			for (i in eggPositions.indices) {
+				if (i < state.eggPositions.size) {
+					val stateEgg = state.eggPositions[i]
+					eggPositions[i] = eggPositions[i].copy(alpha = stateEgg.alpha)
+				}
+			}
+		}
+	}
+
+	// Create bitmap with remembered size.
 	val bitmap = remember(canvasSize) {
 		if (canvasSize != IntSize.Zero) {
 			createBitmap(canvasSize.width, canvasSize.height)
 		} else {
-			createBitmap(1, 1) // Fallback
+			createBitmap(1, 1) // Fallback.
 		}
 	}
 
@@ -339,15 +351,17 @@ fun DrawCanvas(
 				canvasSize = coordinates.size
 			}
 			.pointerInput(Unit) {
-				// Handle drag gestures
+				// Handle drag gestures.
 				detectDragGestures(
 					onDragStart = { offset ->
 						eggPositions.forEachIndexed { index, point ->
+							val eggWidth = (eggNormal?.intrinsicWidth?.toFloat() ?: 0f)
+							val eggHeight = (eggNormal?.intrinsicHeight?.toFloat() ?: 0f)
 							val bounds = RectF(
 								point.point.x,
 								point.point.y,
-								point.point.x + (eggNormal?.intrinsicWidth?.toFloat() ?: 0f) * point.scale,
-								point.point.y + (eggNormal?.intrinsicHeight?.toFloat() ?: 0f) * point.scale
+								point.point.x + eggWidth * point.scale,
+								point.point.y + eggHeight * point.scale
 							)
 							if (bounds.contains(offset.x, offset.y)) {
 								point.isDragging = true
@@ -360,30 +374,30 @@ fun DrawCanvas(
 				) { change, dragAmount ->
 					eggPositions.forEachIndexed { index, point ->
 						if (point.isDragging) {
+							val eggWidth = (eggNormal?.intrinsicWidth?.toFloat() ?: 0f)
+							val eggHeight = (eggNormal?.intrinsicHeight?.toFloat() ?: 0f)
 							val newX = (point.point.x + dragAmount.x)
-								.coerceIn(0f, size.width - (eggNormal?.intrinsicWidth?.toFloat() ?: 0f) * point.scale)
+								.coerceIn(0f, size.width - eggWidth * point.scale)
 							val newY = (point.point.y + dragAmount.y)
-								.coerceIn(0f, size.height - (eggNormal?.intrinsicHeight?.toFloat() ?: 0f) * point.scale)
-							eggPositions[index] = point.copy(
-								point = Offset(newX, newY)
-							)
-							onAction(
-								BasketScreenAction.CheckEggPositionsChanged(eggPositions)
-							)
+								.coerceIn(0f, size.height - eggHeight * point.scale)
+							eggPositions[index] = point.copy(point = Offset(newX, newY))
+							onAction(BasketScreenAction.CheckEggPositionsChanged(eggPositions))
 							onAction(BasketScreenAction.CheckEggsInBasket(eggPositions))
 						}
 					}
 					change.consume()
 				}
-				// Handle tap gestures to unselect eggs
+				// Handle tap gestures to unselect eggs.
 				detectTapGestures { offset ->
 					var isEggTapped = false
 					eggPositions.forEachIndexed { index, point ->
+						val eggWidth = (eggNormal?.intrinsicWidth?.toFloat() ?: 0f)
+						val eggHeight = (eggNormal?.intrinsicHeight?.toFloat() ?: 0f)
 						val bounds = RectF(
 							point.point.x,
 							point.point.y,
-							point.point.x + (eggNormal?.intrinsicWidth?.toFloat() ?: 0f) * point.scale,
-							point.point.y + (eggNormal?.intrinsicHeight?.toFloat() ?: 0f) * point.scale
+							point.point.x + eggWidth * point.scale,
+							point.point.y + eggHeight * point.scale
 						)
 						if (bounds.contains(offset.x, offset.y)) {
 							isEggTapped = true
@@ -399,26 +413,32 @@ fun DrawCanvas(
 		val canvas = android.graphics.Canvas(bitmap)
 		canvas.drawColor(android.graphics.Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
 
-		// Draw eggs
+		// Draw eggs.
 		eggPositions.forEach { point ->
-			// Choose drawable based on isDragging
-			val eggDrawable = if (point.isDragging) eggShine else eggNormal
-			eggDrawable?.let { draw ->
-				val centerX = point.point.x + draw.intrinsicWidth / 2f
-				val centerY = point.point.y + draw.intrinsicHeight / 2f
-				canvas.rotate(point.rotation, centerX, centerY)
-				draw.setBounds(
-					point.point.x.toInt(),
-					point.point.y.toInt(),
-					(point.point.x + draw.intrinsicWidth * point.scale).toInt(),
-					(point.point.y + draw.intrinsicHeight * point.scale).toInt()
-				)
-				draw.draw(canvas)
-				canvas.rotate(-point.rotation, centerX, centerY)
+			// Print debug info for each egg
+			println("Drawing egg ${point.key} with alpha ${point.alpha}")
+
+			// Skip drawing eggs with alpha 0 (collected eggs)
+			if (point.alpha > 0) {
+				// Choose drawable based on isDragging.
+				val eggDrawable = if (point.isDragging) eggShine else eggNormal
+				eggDrawable?.let { draw ->
+					val centerX = point.point.x + draw.intrinsicWidth / 2f
+					val centerY = point.point.y + draw.intrinsicHeight / 2f
+					canvas.rotate(point.rotation, centerX, centerY)
+					draw.setBounds(
+						point.point.x.toInt(),
+						point.point.y.toInt(),
+						(point.point.x + draw.intrinsicWidth * point.scale).toInt(),
+						(point.point.y + draw.intrinsicHeight * point.scale).toInt()
+					)
+					draw.draw(canvas)
+					canvas.rotate(-point.rotation, centerX, centerY)
+				}
 			}
 		}
 
-		// Draw fixed basket
+		// Draw fixed basket.
 		val basketDrawable = if (state.hotZone) basketShine else basketNormal
 		basketDrawable?.let { draw ->
 			val width = draw.intrinsicWidth
@@ -426,7 +446,7 @@ fun DrawCanvas(
 			val basketX = (size.width - width) / 2
 			val basketY = size.height - height
 
-			// Update basket bounds in state
+			// Update basket bounds in state.
 			val basketBounds = RectF(
 				basketX,
 				basketY,
@@ -434,7 +454,6 @@ fun DrawCanvas(
 				basketY + height
 			)
 			onAction(BasketScreenAction.UpdateBasketBounds(basketBounds))
-
 			draw.setBounds(
 				basketX.toInt(),
 				basketY.toInt(),
@@ -443,7 +462,6 @@ fun DrawCanvas(
 			)
 			draw.draw(canvas)
 		}
-
 		drawImage(image = bitmap.asImageBitmap())
 	}
 }
