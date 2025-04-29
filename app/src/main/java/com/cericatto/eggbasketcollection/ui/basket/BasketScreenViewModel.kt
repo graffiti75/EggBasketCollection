@@ -83,7 +83,6 @@ class BasketScreenViewModel @Inject constructor() : ViewModel() {
 	}
 
 	private fun onResetButtonClicked() {
-		println("BasketScreenViewModel.onResetButtonClicked()")
 		_state.update { state ->
 			state.copy(
 				reset = true,
@@ -102,7 +101,6 @@ class BasketScreenViewModel @Inject constructor() : ViewModel() {
 	}
 
 	private fun onAfterResetButtonClicked() {
-		println("BasketScreenViewModel.onAfterResetButtonClicked()")
 		_state.update { state ->
 			state.copy(
 				reset = false

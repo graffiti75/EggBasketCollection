@@ -294,8 +294,32 @@ fun DrawCanvas(
 	val density = LocalDensity.current
 	val eggNormal = ContextCompat.getDrawable(context, R.drawable.egg_normal)
 	val eggShine = ContextCompat.getDrawable(context, R.drawable.egg_shine)
-	val basketNormal = ContextCompat.getDrawable(context, R.drawable.basket_zero_normal)
-	val basketShine = ContextCompat.getDrawable(context, R.drawable.basket_zero_shine)
+
+	// Update basket drawable selection based on egg count.
+	val basketNormal = when(state.eggsInBasket) {
+		0 -> ContextCompat.getDrawable(context, R.drawable.basket_zero_normal)
+		1 -> ContextCompat.getDrawable(context, R.drawable.basket_one_normal)
+		2 -> ContextCompat.getDrawable(context, R.drawable.basket_two_normal)
+		3 -> ContextCompat.getDrawable(context, R.drawable.basket_three_normal)
+		4 -> ContextCompat.getDrawable(context, R.drawable.basket_four_normal)
+		5 -> ContextCompat.getDrawable(context, R.drawable.basket_five_normal)
+		6 -> ContextCompat.getDrawable(context, R.drawable.basket_six_normal)
+		else -> ContextCompat.getDrawable(context, R.drawable.basket_zero_normal)
+	}
+
+	val basketShine = when(state.eggsInBasket) {
+		0 -> ContextCompat.getDrawable(context, R.drawable.basket_zero_shine)
+		1 -> ContextCompat.getDrawable(context, R.drawable.basket_one_shine)
+		2 -> ContextCompat.getDrawable(context, R.drawable.basket_two_shine)
+		3 -> ContextCompat.getDrawable(context, R.drawable.basket_three_shine)
+		4 -> ContextCompat.getDrawable(context, R.drawable.basket_four_shine)
+		5 -> ContextCompat.getDrawable(context, R.drawable.basket_five_shine)
+		6 -> ContextCompat.getDrawable(context, R.drawable.basket_six_shine)
+		else -> ContextCompat.getDrawable(context, R.drawable.basket_zero_shine)
+	}
+
+//	val basketNormal = ContextCompat.getDrawable(context, R.drawable.basket_zero_normal)
+//	val basketShine = ContextCompat.getDrawable(context, R.drawable.basket_zero_shine)
 	val padding = with(density) { 40.dp.toPx() }
 
 	// State for canvas size.
@@ -389,6 +413,9 @@ fun DrawCanvas(
 		}
 	}
 
+	// Track if any egg is currently being dragged over the hot zone
+	var isDraggingOverHotZone by remember { mutableStateOf(false) }
+
 	// Update values from state.eggPositions.
 	LaunchedEffect(state.eggPositions) {
 		if (state.eggPositions.isNotEmpty() && eggPositions.isNotEmpty()) {
@@ -465,6 +492,15 @@ fun DrawCanvas(
 							val newY = (point.point.y + dragAmount.y)
 								.coerceIn(0f, size.height - eggHeight * point.scale)
 							eggPositions[index] = point.copy(point = Offset(newX, newY))
+
+							// Check if the egg is over the basket (hot zone).
+							val basketBounds = state.basketBounds
+							if (basketBounds != null) {
+								val eggCenterX = newX + eggWidth / 2
+								val eggCenterY = newY + eggHeight / 2
+								isDraggingOverHotZone = basketBounds.contains(eggCenterX, eggCenterY)
+							}
+
 							onAction(BasketScreenAction.CheckEggPositionsChanged(eggPositions))
 							onAction(BasketScreenAction.CheckEggsInBasket(eggPositions))
 						}
@@ -523,8 +559,9 @@ fun DrawCanvas(
 			}
 		}
 
-		// Draw fixed basket.
-		val basketDrawable = if (state.hotZone) basketShine else basketNormal
+		// Draw fixed basket - using isDraggingOverHotZone instead of state.hotZone for shine effect.
+		val basketDrawable = if (isDraggingOverHotZone) basketShine else basketNormal
+//		val basketDrawable = if (state.hotZone) basketShine else basketNormal
 		basketDrawable?.let { draw ->
 			val width = draw.intrinsicWidth
 			val height = draw.intrinsicHeight
