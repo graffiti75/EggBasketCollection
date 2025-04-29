@@ -2,6 +2,7 @@ package com.cericatto.eggbasketcollection.ui.basket
 
 import android.annotation.SuppressLint
 import android.graphics.RectF
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -27,6 +28,7 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -321,15 +323,83 @@ fun DrawCanvas(
 		onAction(BasketScreenAction.OnAfterResetButtonClicked)
 	}
 
-	// Update alpha values from state.eggPositions.
-	// This ensures that the alpha values from ViewModel are applied.
+	// Handle animation triggered by state changes.
+	LaunchedEffect(state.animationId) {
+		val eggIndex = state.eggToAnimate
+
+		// CRITICAL FIX: Don't use the targetPosition from state - this might be (0,0)
+		// Instead, calculate the correct initial position for this egg based on canvas dimensions
+		val correctInitialPosition = if (eggIndex >= 0 && eggIndex < initialEggPositions(canvasWidth, canvasHeight, padding).size) {
+			initialEggPositions(canvasWidth, canvasHeight, padding)[eggIndex].point
+		} else {
+			Offset(canvasWidth / 2, padding) // Fallback.
+		}
+
+		if (eggIndex >= 0 && eggIndex < eggPositions.size && state.animationId > 0) {
+			// Create animatables for X and Y coordinates.
+			val currentPosition = eggPositions[eggIndex].point
+			val animatableX = Animatable(currentPosition.x)
+			val animatableY = Animatable(currentPosition.y)
+
+			// Use a spring animation spec for more natural movement.
+			val springSpec = androidx.compose.animation.core.spring<Float>(
+				dampingRatio = 0.7f,  // Less than 1.0 for slight bounce effect.
+				stiffness = 300f      // Higher value for faster return.
+			)
+
+			println("Animating egg $eggIndex from ${currentPosition.x},${currentPosition.y} " +
+				"to ${correctInitialPosition.x},${correctInitialPosition.y}")
+
+			// Run animations in parallel and update position on each frame.
+			launch {
+				animatableX.animateTo(
+					targetValue = correctInitialPosition.x,
+					animationSpec = springSpec
+				) {
+					// Update X position on each animation frame.
+					val newX = this.value
+					val currentY = eggPositions[eggIndex].point.y
+					eggPositions[eggIndex] = eggPositions[eggIndex].copy(
+						point = Offset(newX, currentY)
+					)
+				}
+			}
+
+			launch {
+				animatableY.animateTo(
+					targetValue = correctInitialPosition.y,
+					animationSpec = springSpec
+				) {
+					// Update Y position on each animation frame.
+					val newY = this.value
+					val currentX = eggPositions[eggIndex].point.x
+					eggPositions[eggIndex] = eggPositions[eggIndex].copy(
+						point = Offset(currentX, newY)
+					)
+				}
+			}.join() // Wait for vertical animation to complete.
+
+			// Ensure the final position is exactly the correct initial position.
+			eggPositions[eggIndex] = eggPositions[eggIndex].copy(
+				point = correctInitialPosition
+			)
+
+			// Notify ViewModel that animation is complete.
+			onAction(BasketScreenAction.UpdateEggPosition(eggIndex, correctInitialPosition))
+		}
+	}
+
+	// Update values from state.eggPositions.
 	LaunchedEffect(state.eggPositions) {
 		if (state.eggPositions.isNotEmpty() && eggPositions.isNotEmpty()) {
-			// Just update the alpha values, not positions.
+			// Update positions and alpha values (except for the one being animated).
 			for (i in eggPositions.indices) {
-				if (i < state.eggPositions.size) {
+				if (i < state.eggPositions.size && i != state.eggToAnimate) {
 					val stateEgg = state.eggPositions[i]
-					eggPositions[i] = eggPositions[i].copy(alpha = stateEgg.alpha)
+					eggPositions[i] = eggPositions[i].copy(
+						point = stateEgg.point,
+						alpha = stateEgg.alpha
+					)
 				}
 			}
 		}
@@ -343,6 +413,9 @@ fun DrawCanvas(
 			createBitmap(1, 1) // Fallback.
 		}
 	}
+
+	// Track the currently dragged egg index.
+	var draggedEggIndex by remember { mutableIntStateOf(-1) }
 
 	Canvas(
 		modifier = modifier
@@ -365,11 +438,22 @@ fun DrawCanvas(
 							)
 							if (bounds.contains(offset.x, offset.y)) {
 								point.isDragging = true
+								draggedEggIndex = index
 							}
 						}
 					},
 					onDragEnd = {
 						eggPositions.forEach { it.isDragging = false }
+						// Call the new action when drag ends.
+						if (draggedEggIndex >= 0) {
+							onAction(
+								BasketScreenAction.OnEggDragEnd(
+									eggPositions = eggPositions.toList(),
+									draggedEggIndex = draggedEggIndex
+								)
+							)
+							draggedEggIndex = -1
+						}
 					}
 				) { change, dragAmount ->
 					eggPositions.forEachIndexed { index, point ->
@@ -402,10 +486,12 @@ fun DrawCanvas(
 						if (bounds.contains(offset.x, offset.y)) {
 							isEggTapped = true
 							point.isDragging = true
+							draggedEggIndex = index
 						}
 					}
 					if (!isEggTapped) {
 						eggPositions.forEach { it.isDragging = false }
+						draggedEggIndex = -1
 					}
 				}
 			}
@@ -415,22 +501,21 @@ fun DrawCanvas(
 
 		// Draw eggs.
 		eggPositions.forEach { point ->
-			// Print debug info for each egg
-			println("Drawing egg ${point.key} with alpha ${point.alpha}")
-
-			// Skip drawing eggs with alpha 0 (collected eggs)
+			// Skip drawing eggs with alpha 0 (collected eggs).
 			if (point.alpha > 0) {
 				// Choose drawable based on isDragging.
 				val eggDrawable = if (point.isDragging) eggShine else eggNormal
 				eggDrawable?.let { draw ->
-					val centerX = point.point.x + draw.intrinsicWidth / 2f
-					val centerY = point.point.y + draw.intrinsicHeight / 2f
+					val eggWidth = draw.intrinsicWidth
+					val eggHeight = draw.intrinsicHeight
+					val centerX = point.point.x + eggWidth / 2f
+					val centerY = point.point.y + eggHeight / 2f
 					canvas.rotate(point.rotation, centerX, centerY)
 					draw.setBounds(
 						point.point.x.toInt(),
 						point.point.y.toInt(),
-						(point.point.x + draw.intrinsicWidth * point.scale).toInt(),
-						(point.point.y + draw.intrinsicHeight * point.scale).toInt()
+						(point.point.x + eggWidth * point.scale).toInt(),
+						(point.point.y + eggHeight * point.scale).toInt()
 					)
 					draw.draw(canvas)
 					canvas.rotate(-point.rotation, centerX, centerY)

@@ -25,7 +25,11 @@ data class BasketScreenState(
 	// Basket scoring:
 	val hotZone: Boolean = false,
 	val eggsInBasket: Int = 0,
-	val basketBounds: android.graphics.RectF? = null
+	val basketBounds: android.graphics.RectF? = null,
+	// Animation control:
+	val eggToAnimate: Int = -1,
+	val targetPosition: Offset = Offset.Zero,
+	val animationId: Long = 0 // This changes when a new animation should start.
 )
 
 fun initialEmptyEggPositions() = List(6) { CanvasPoint(point = Offset(0f, 0f)) }
