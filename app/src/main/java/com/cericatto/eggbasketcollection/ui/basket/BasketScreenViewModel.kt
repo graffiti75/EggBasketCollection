@@ -16,8 +16,6 @@ class BasketScreenViewModel @Inject constructor(): ViewModel() {
 
 	fun onAction(action: BasketScreenAction) {
 		when (action) {
-//			is BasketScreenAction.UpdateEggPositions -> updateEggPositions(action.eggPositions)
-//			is BasketScreenAction.UpdateEggPosition -> updateEggPosition(action.index, action.offset)
 			is BasketScreenAction.UpdateCanvasDimensions -> updateCanvasDimensions(
 				action.canvasWidth,
 				action.canvasHeight,
@@ -36,29 +34,6 @@ class BasketScreenViewModel @Inject constructor(): ViewModel() {
 			)
 		}
 	}
-
-	/*
-	private fun updateEggPosition(index: Int, offset: Offset) {
-		var updatedEggPositions = _state.value.eggPositions.toMutableList()
-		updatedEggPositions[index].point = offset
-		_state.update { state ->
-			state.copy(
-				eggPositions = updatedEggPositions.toList()
-			)
-		}
-	}
-	 */
-
-	/*
-	private fun updateEggPositions(eggPositions: List<CanvasPoint>) {
-		_state.update { state ->
-			state.copy(
-				eggPositions = eggPositions,
-				changedEggPositions = state.eggPositionsChanged()
-			)
-		}
-	}
-	 */
 
 	private fun updateCanvasDimensions(
 		canvasWidth: Float = 0f,

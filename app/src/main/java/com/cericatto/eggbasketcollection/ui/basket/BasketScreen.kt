@@ -264,15 +264,16 @@ fun DrawCanvas(
 		)
 	}
 
+	// Then handle the reset by updating the existing list
 	if (state.reset) {
-		eggPositions = remember(canvasWidth, canvasHeight) {
-			mutableStateListOf(
-				*initialEggPositions(canvasWidth, canvasHeight, padding).toTypedArray()
-			)
+		val initialPositions = initialEggPositions(canvasWidth, canvasHeight, padding)
+		// Update existing list in-place instead of creating a new one
+		for (i in eggPositions.indices) {
+			if (i < initialPositions.size) {
+				eggPositions[i] = initialPositions[i]
+			}
 		}
-		onAction(
-			BasketScreenAction.OnAfterResetButtonClicked
-		)
+		onAction(BasketScreenAction.OnAfterResetButtonClicked)
 	}
 
 	// Create bitmap with remembered size
@@ -316,10 +317,6 @@ fun DrawCanvas(
 								.coerceIn(0f, size.width - (eggNormal?.intrinsicWidth?.toFloat() ?: 0f) * point.scale)
 							val newY = (point.point.y + dragAmount.y)
 								.coerceIn(0f, size.height - (eggNormal?.intrinsicHeight?.toFloat() ?: 0f) * point.scale)
-							// FIXME
-//							onAction(
-//								BasketScreenAction.UpdateEggPosition(index, Offset(newX, newY))
-//							)
 							eggPositions[index] = point.copy(
 								point = Offset(newX, newY)
 							)
