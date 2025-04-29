@@ -16,7 +16,10 @@ data class BasketScreenState(
 	val canvasHeight: Float = 0f,
 	val padding: Float = 0f,
 	var changedEggPositions: Boolean = false,
-	var reset: Boolean = true
+	var reset: Boolean = true,
+	// Basket scoring:
+	val eggsInBasket: Int = 0,
+	val basketBounds: android.graphics.RectF? = null
 )
 
 fun initialEmptyEggPositions() = List(6) { CanvasPoint(point = Offset(0f, 0f)) }

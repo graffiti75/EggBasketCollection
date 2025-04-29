@@ -124,7 +124,7 @@ fun BasketScreenContent(
 				.fillMaxWidth()
 				.padding(horizontal = 10.dp)
 		) {
-			EggPoints()
+			EggPoints(state)
 			RestartButton(
 				onAction = onAction,
 				state = state,
@@ -149,6 +149,7 @@ fun BasketScreenContent(
 
 @Composable
 private fun EggPoints(
+	state: BasketScreenState,
 	modifier: Modifier = Modifier
 ) {
 	Box(
@@ -172,7 +173,7 @@ private fun EggPoints(
 					.size(32.dp)
 			)
 			Text(
-				text = "0",
+				text = "${state.eggsInBasket}",
 				style = TextStyle(
 					fontFamily = nunitoBoldFont,
 					color = Color.White,
@@ -323,6 +324,7 @@ fun DrawCanvas(
 							onAction(
 								BasketScreenAction.CheckEggPositionsChanged(eggPositions)
 							)
+							onAction(BasketScreenAction.CheckEggsInBasket(eggPositions))
 						}
 					}
 					change.consume()
@@ -376,6 +378,16 @@ fun DrawCanvas(
 			val height = draw.intrinsicHeight
 			val basketX = (size.width - width) / 2
 			val basketY = size.height - height
+
+			// Update basket bounds in state
+			val basketBounds = RectF(
+				basketX,
+				basketY,
+				basketX + width,
+				basketY + height
+			)
+			onAction(BasketScreenAction.UpdateBasketBounds(basketBounds))
+
 			draw.setBounds(
 				basketX.toInt(),
 				basketY.toInt(),
@@ -403,5 +415,7 @@ private fun BasketScreenPreview() {
 @Preview(showBackground = true)
 @Composable
 private fun EggPointsPreview() {
-	EggPoints()
+	EggPoints(
+		state = BasketScreenState()
+	)
 }

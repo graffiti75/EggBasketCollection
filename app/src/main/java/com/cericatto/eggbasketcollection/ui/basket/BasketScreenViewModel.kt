@@ -1,5 +1,6 @@
 package com.cericatto.eggbasketcollection.ui.basket
 
+import android.graphics.RectF
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +25,8 @@ class BasketScreenViewModel @Inject constructor(): ViewModel() {
 			is BasketScreenAction.OnResetButtonClicked -> onResetButtonClicked()
 			is BasketScreenAction.CheckEggPositionsChanged -> checkEggPositionsChanged(action.eggPositions)
 			is BasketScreenAction.OnAfterResetButtonClicked -> onAfterResetButtonClicked()
+			is BasketScreenAction.CheckEggsInBasket -> checkEggsInBasket(action.eggPositions)
+			is BasketScreenAction.UpdateBasketBounds -> updateBasketBounds(action.bounds)
 		}
 	}
 
@@ -59,7 +62,8 @@ class BasketScreenViewModel @Inject constructor(): ViewModel() {
 		_state.update { state ->
 			state.copy(
 				reset = true,
-				changedEggPositions = false
+				changedEggPositions = false,
+				eggsInBasket = 0
 			)
 		}
 	}
@@ -83,6 +87,37 @@ class BasketScreenViewModel @Inject constructor(): ViewModel() {
 					padding = state.padding
 				)
 			)
+		}
+	}
+
+	private fun updateBasketBounds(bounds: RectF) {
+		_state.update { state ->
+			state.copy(basketBounds = bounds)
+		}
+	}
+
+	private fun checkEggsInBasket(eggPositions: List<CanvasPoint>) {
+		val basketBounds = _state.value.basketBounds ?: return
+
+		// Count eggs that have their center point inside the basket.
+		var count = 0
+		for (eggPosition in eggPositions) {
+			// Calculate egg center point
+			val eggWidth = 100f * eggPosition.scale // Approximate egg width
+			val eggHeight = 130f * eggPosition.scale // Approximate egg height
+
+			val eggCenterX = eggPosition.point.x + eggWidth / 2
+			val eggCenterY = eggPosition.point.y + eggHeight / 2
+
+			// Check if center is in basket bounds
+			if (basketBounds.contains(eggCenterX, eggCenterY)) {
+				count++
+			}
+		}
+
+		// Update state with new count
+		_state.update { state ->
+			state.copy(eggsInBasket = count)
 		}
 	}
 }
