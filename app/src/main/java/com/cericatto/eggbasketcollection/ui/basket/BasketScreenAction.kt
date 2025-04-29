@@ -13,4 +13,5 @@ sealed interface BasketScreenAction {
 	data class CheckEggPositionsChanged(val eggPositions: List<CanvasPoint>) : BasketScreenAction
 	data class UpdateBasketBounds(val bounds: RectF) : BasketScreenAction
 	data class CheckEggsInBasket(val eggPositions: List<CanvasPoint>) : BasketScreenAction
+	data object CollectedAllEggs : BasketScreenAction
 }

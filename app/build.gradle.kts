@@ -64,8 +64,6 @@ dependencies {
 	implementation(libs.squareup.retrofit2.converter.gson)
 	implementation(libs.squareup.retrofit2.converter.moshi)
 	implementation(libs.squareup.okhttp3.logging.interceptor)
-	implementation(libs.moshi.kotlin)
-	ksp(libs.moshi.kotlin.codegen)
 
 	// Navigation
 	implementation(libs.navigation.compose)

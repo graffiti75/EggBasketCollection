@@ -1,5 +1,6 @@
 package com.cericatto.eggbasketcollection.ui.basket
 
+import android.annotation.SuppressLint
 import android.graphics.RectF
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -18,6 +19,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
@@ -25,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,11 +54,14 @@ import androidx.core.graphics.createBitmap
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cericatto.eggbasketcollection.R
+import com.cericatto.eggbasketcollection.ui.ObserveAsEvents
+import com.cericatto.eggbasketcollection.ui.UiEvent
 import com.cericatto.eggbasketcollection.ui.theme.backgroundFirstColor
 import com.cericatto.eggbasketcollection.ui.theme.backgroundLastColor
 import com.cericatto.eggbasketcollection.ui.theme.brown
 import com.cericatto.eggbasketcollection.ui.theme.nunitoBoldFont
 import com.cericatto.eggbasketcollection.ui.theme.titleColor
+import kotlinx.coroutines.launch
 
 @Composable
 fun BasketScreenRoot(
@@ -61,18 +69,37 @@ fun BasketScreenRoot(
 	viewModel: BasketScreenViewModel = hiltViewModel()
 ) {
 	val state by viewModel.state.collectAsStateWithLifecycle()
+	val scope = rememberCoroutineScope()
+	val snackbarHostState = remember { SnackbarHostState() }
+	val context = LocalContext.current
+	ObserveAsEvents(viewModel.events) { event ->
+		when (event) {
+			is UiEvent.ShowSnackbar -> {
+				scope.launch {
+					snackbarHostState.showSnackbar(
+						message = event.message.asString(context)
+					)
+				}
+			}
+			else -> Unit
+		}
+	}
+
 	BasketScreen(
-		modifier = modifier,
 		onAction = viewModel::onAction,
-		state = state
+		state = state,
+		snackbarHostState = snackbarHostState,
+		modifier = modifier
 	)
 }
 
+@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
 private fun BasketScreen(
-	modifier: Modifier = Modifier,
 	onAction: (BasketScreenAction) -> Unit,
-	state: BasketScreenState
+	state: BasketScreenState,
+	snackbarHostState: SnackbarHostState,
+	modifier: Modifier = Modifier
 ) {
 	if (state.loading) {
 		Box(
@@ -88,11 +115,17 @@ private fun BasketScreen(
 			)
 		}
 	} else {
-		BasketScreenContent(
-			onAction = onAction,
-			state = state,
-			modifier = modifier
-		)
+		Scaffold(
+			snackbarHost = {
+				SnackbarHost(hostState = snackbarHostState)
+			},
+		) { _ ->
+			BasketScreenContent(
+				onAction = onAction,
+				state = state,
+				modifier = modifier
+			)
+		}
 	}
 }
 
@@ -124,7 +157,10 @@ fun BasketScreenContent(
 				.fillMaxWidth()
 				.padding(horizontal = 10.dp)
 		) {
-			EggPoints(state)
+			EggPoints(
+				onAction = onAction,
+				state = state
+			)
 			RestartButton(
 				onAction = onAction,
 				state = state,
@@ -149,6 +185,7 @@ fun BasketScreenContent(
 
 @Composable
 private fun EggPoints(
+	onAction: (BasketScreenAction) -> Unit,
 	state: BasketScreenState,
 	modifier: Modifier = Modifier
 ) {
@@ -181,6 +218,10 @@ private fun EggPoints(
 				),
 				modifier = Modifier.padding(end = 10.dp)
 			)
+
+			if (state.eggsInBasket == EGG_NUMBER) {
+				onAction(BasketScreenAction.CollectedAllEggs)
+			}
 		}
 		Image(
 			painter = painterResource(R.drawable.basket_three_normal),
@@ -249,10 +290,11 @@ fun DrawCanvas(
 	val density = LocalDensity.current
 	val eggNormal = ContextCompat.getDrawable(context, R.drawable.egg_normal)
 	val eggShine = ContextCompat.getDrawable(context, R.drawable.egg_shine)
-	val basket = ContextCompat.getDrawable(context, R.drawable.basket_zero_normal)
+	val basketNormal = ContextCompat.getDrawable(context, R.drawable.basket_zero_normal)
+	val basketShine = ContextCompat.getDrawable(context, R.drawable.basket_zero_shine)
 	val padding = with(density) { 40.dp.toPx() }
 
-	// State for canvas size
+	// State for canvas size.
 	var canvasSize by remember { mutableStateOf(IntSize.Zero) }
 	val canvasWidth = canvasSize.width.toFloat()
 	val canvasHeight = canvasSize.height.toFloat() * 0.8f // 80% of screen height
@@ -263,6 +305,10 @@ fun DrawCanvas(
 		mutableStateListOf(
 			*initialEggPositions(canvasWidth, canvasHeight, padding).toTypedArray()
 		)
+	}
+
+	if (state.hotZone) {
+
 	}
 
 	// Then handle the reset by updating the existing list
@@ -373,7 +419,8 @@ fun DrawCanvas(
 		}
 
 		// Draw fixed basket
-		basket?.let { draw ->
+		val basketDrawable = if (state.hotZone) basketShine else basketNormal
+		basketDrawable?.let { draw ->
 			val width = draw.intrinsicWidth
 			val height = draw.intrinsicHeight
 			val basketX = (size.width - width) / 2
@@ -408,7 +455,8 @@ private fun BasketScreenPreview() {
 		onAction = {},
 		state = BasketScreenState().copy(
 			loading = false
-		)
+		),
+		snackbarHostState = SnackbarHostState()
 	)
 }
 
@@ -416,6 +464,7 @@ private fun BasketScreenPreview() {
 @Composable
 private fun EggPointsPreview() {
 	EggPoints(
+		onAction = {},
 		state = BasketScreenState()
 	)
 }

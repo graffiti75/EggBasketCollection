@@ -2,18 +2,28 @@ package com.cericatto.eggbasketcollection.ui.basket
 
 import android.graphics.RectF
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.cericatto.eggbasketcollection.R
+import com.cericatto.eggbasketcollection.ui.UiEvent
+import com.cericatto.eggbasketcollection.ui.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class BasketScreenViewModel @Inject constructor(): ViewModel() {
+class BasketScreenViewModel @Inject constructor() : ViewModel() {
 
 	private val _state = MutableStateFlow(BasketScreenState())
 	val state: StateFlow<BasketScreenState> = _state.asStateFlow()
+
+	private val _events = Channel<UiEvent>()
+	val events = _events.receiveAsFlow()
 
 	fun onAction(action: BasketScreenAction) {
 		when (action) {
@@ -22,11 +32,13 @@ class BasketScreenViewModel @Inject constructor(): ViewModel() {
 				action.canvasHeight,
 				action.padding
 			)
+
 			is BasketScreenAction.OnResetButtonClicked -> onResetButtonClicked()
 			is BasketScreenAction.CheckEggPositionsChanged -> checkEggPositionsChanged(action.eggPositions)
 			is BasketScreenAction.OnAfterResetButtonClicked -> onAfterResetButtonClicked()
 			is BasketScreenAction.CheckEggsInBasket -> checkEggsInBasket(action.eggPositions)
 			is BasketScreenAction.UpdateBasketBounds -> updateBasketBounds(action.bounds)
+			is BasketScreenAction.CollectedAllEggs -> collectedAllEggs()
 		}
 	}
 
@@ -112,6 +124,13 @@ class BasketScreenViewModel @Inject constructor(): ViewModel() {
 			// Check if center is in basket bounds
 			if (basketBounds.contains(eggCenterX, eggCenterY)) {
 				count++
+				_state.update { state ->
+					state.copy(hotZone = true)
+				}
+			} else {
+				_state.update { state ->
+					state.copy(hotZone = false)
+				}
 			}
 		}
 
@@ -119,5 +138,16 @@ class BasketScreenViewModel @Inject constructor(): ViewModel() {
 		_state.update { state ->
 			state.copy(eggsInBasket = count)
 		}
+	}
+
+	private fun collectedAllEggs() {
+		viewModelScope.launch {
+			callSnackbar(UiText.StringResource(R.string.collected_all))
+		}
+
+	}
+
+	private suspend fun callSnackbar(text: UiText) {
+		_events.send(UiEvent.ShowSnackbar(text))
 	}
 }

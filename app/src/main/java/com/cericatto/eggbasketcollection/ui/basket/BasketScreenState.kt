@@ -2,6 +2,8 @@ package com.cericatto.eggbasketcollection.ui.basket
 
 import androidx.compose.ui.geometry.Offset
 
+const val EGG_NUMBER = 6
+
 data class CanvasPoint(
 	var point: Offset,
 	val rotation: Float = 0f,
@@ -18,6 +20,7 @@ data class BasketScreenState(
 	var changedEggPositions: Boolean = false,
 	var reset: Boolean = true,
 	// Basket scoring:
+	val hotZone: Boolean = false,
 	val eggsInBasket: Int = 0,
 	val basketBounds: android.graphics.RectF? = null
 )

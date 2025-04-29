@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">EggBasketCollection</string>
+    <string name="aim_basket">🧺 Aim for the basket!</string>
+    <string name="collected_all">You\'ve collected them all!</string>
 </resources>
