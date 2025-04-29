@@ -222,10 +222,6 @@ private fun EggPoints(
 				),
 				modifier = Modifier.padding(end = 10.dp)
 			)
-
-			if (state.eggsInBasket == EGG_NUMBER) {
-				onAction(BasketScreenAction.CollectedAllEggs)
-			}
 		}
 		Image(
 			painter = painterResource(R.drawable.basket_three_normal),
@@ -249,7 +245,7 @@ private fun RestartButton(
 		verticalAlignment = Alignment.CenterVertically,
 		modifier = modifier
 			.alpha(
-				if (!state.changedEggPositions) 0f else 1f
+				if (state.eggsInBasket < 1) 0f else 1f
 			)
 			.clickable {
 				onAction(
@@ -345,6 +341,12 @@ fun DrawCanvas(
 			}
 		}
 		onAction(BasketScreenAction.OnAfterResetButtonClicked)
+	}
+
+	LaunchedEffect(state.eggsInBasket) {
+		if (state.eggsInBasket == EGG_NUMBER) {
+			onAction(BasketScreenAction.CollectedAllEggs)
+		}
 	}
 
 	// Handle animation triggered by state changes.
